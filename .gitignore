@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Make sure NOT to push full transcripts or LanceDB files to git. 
+data
+knowledge_base
