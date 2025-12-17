@@ -209,3 +209,7 @@ __marimo__/
 # Make sure NOT to push full transcripts or LanceDB files to git. 
 data
 knowledge_base
+
+# Skip personal settings
+
+settings.json
