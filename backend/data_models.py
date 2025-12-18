@@ -1,24 +1,76 @@
+"""Data models for RAG system.
+
+Defines LanceDB schemas for different embedding providers and ingestion strategies:
+- TranscriptGeminiWhole: Gemini embeddings (3072-dim), whole-document
+- TranscriptMpnetWhole: SentenceTransformers mpnet embeddings (768-dim), whole-document
+- Future: TranscriptGeminiChunk, TranscriptMpnetChunk for chunk-level ingestion
+
+Shared models:
+- Prompt: user query input
+- RagResponse: structured LLM response with sources
+"""
 from pydantic import BaseModel, Field
 from lancedb.embeddings import get_registry
 from lancedb.pydantic import LanceModel, Vector
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Gemini embedding setup
 embedding_model = get_registry().get("gemini-text").create(name="gemini-embedding-001")
+EMBEDDING_DIM_GEMINI = 3072
 
-EMBEDDING_DIM = 3072
 
-class Transcript(LanceModel):
-    md_id: str 
-    filepath: str 
-    filename: str = Field(description="the stem of the file i.e. without the suffix")
+class TranscriptGeminiWhole(LanceModel):
+    """Whole-document transcript with Gemini embeddings (3072-dim).
+    
+    Requires Gemini API credentials and embedding registry configured.
+    Use ingestion_gemini_whole.py to populate.
+    """
+    md_id: str
+    filepath: str
+    filename: str = Field(description="stem of the file without suffix")
     content: str = embedding_model.SourceField()
-    embedding: Vector(EMBEDDING_DIM) = embedding_model.VectorField()
+    embedding: Vector(EMBEDDING_DIM_GEMINI) = embedding_model.VectorField()
+    embedding_model: str = Field(default="gemini-embedding-001")
+    embedding_provider: str = Field(default="google-genai")
+    embedding_dim: int = Field(default=3072)
+
+
+class TranscriptMpnetWhole(LanceModel):
+    """Whole-document transcript with SentenceTransformers mpnet embeddings (768-dim).
+    
+    Uses local all-mpnet-base-v2 model (no API required).
+    Use ingestion_mpnet_whole.py to populate.
+    """
+    md_id: str
+    filepath: str
+    filename: str = Field(description="stem of the file without suffix")
+    content: str
+    embedding: Vector(768)
+    embedding_model: str = Field(default="all-mpnet-base-v2")
+    embedding_provider: str = Field(default="sentence-transformers")
+    embedding_dim: int = Field(default=768)
+
+
+# Placeholder for future chunk-level models
+# class TranscriptGeminiChunk(LanceModel):
+#     """Chunk-level transcript with Gemini embeddings."""
+
+
+
+# class TranscriptMpnetChunk(LanceModel):
+#     """Chunk-level transcript with mpnet embeddings."""
+
+
 
 class Prompt(BaseModel):
+    """User query input for RAG system."""
     prompt: str = Field(description="prompt from user, if empty consider it as missing")
 
+
 class RagResponse(BaseModel):
+    """Structured response from RAG agent including source provenance."""
     filename: str = Field(description="filename of retrieved file without suffix")
     filepath: str = Field(description="absolute path to the retrieved file")
     answer: str = Field(description="answer based on the retrieved file")
