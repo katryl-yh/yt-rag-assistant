@@ -1,9 +1,7 @@
 """Data models for RAG system.
 
-Defines LanceDB schemas for different embedding providers and ingestion strategies:
+Defines LanceDB schemas for embedding providers and ingestion strategies:
 - TranscriptGeminiWhole: Gemini embeddings (3072-dim), whole-document
-- TranscriptMpnetWhole: SentenceTransformers mpnet embeddings (768-dim), whole-document
-- Future: TranscriptGeminiChunk, TranscriptMpnetChunk for chunk-level ingestion
 
 Shared models:
 - Prompt: user query input
@@ -37,31 +35,9 @@ class TranscriptGeminiWhole(LanceModel):
     embedding_dim: int = Field(default=3072)
 
 
-class TranscriptMpnetWhole(LanceModel):
-    """Whole-document transcript with SentenceTransformers mpnet embeddings (768-dim).
-    
-    Uses local all-mpnet-base-v2 model (no API required).
-    Use ingestion_mpnet_whole.py to populate.
-    """
-    md_id: str
-    filepath: str
-    filename: str = Field(description="stem of the file without suffix")
-    content: str
-    embedding: Vector(768)
-    embedding_model: str = Field(default="all-mpnet-base-v2")
-    embedding_provider: str = Field(default="sentence-transformers")
-    embedding_dim: int = Field(default=768)
-
-
 # Placeholder for future chunk-level models
 # class TranscriptGeminiChunk(LanceModel):
 #     """Chunk-level transcript with Gemini embeddings."""
-
-
-
-# class TranscriptMpnetChunk(LanceModel):
-#     """Chunk-level transcript with mpnet embeddings."""
-
 
 
 class Prompt(BaseModel):
