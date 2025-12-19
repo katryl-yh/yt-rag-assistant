@@ -1,9 +1,8 @@
 """Deduplicate markdown files in `data/` using exact hashing.
 
 Usage:
-    python scripts/clean_data.py
-
-The script creates `data_cleaned/unique/` and `data_cleaned/duplicates/` and a CSV report.
+The script creates folders: /unique/` and `/duplicates/` in data_cleaned/01_deduplicated
+and a CSV report.
 """
 from pathlib import Path
 import hashlib
@@ -12,7 +11,7 @@ import csv
 
 
 DATA_DIR = Path(__file__).parents[1] / "data"
-OUT_DIR = Path(__file__).parents[1] / "data_cleaned"
+OUT_DIR = Path(__file__).parents[1] / "data_cleaned" / "01_deduplicated"
 
 
 def get_file_hash(file_path: Path) -> str:
