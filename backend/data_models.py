@@ -20,6 +20,12 @@ load_dotenv()
 embedding_model = get_registry().get("gemini-text").create(name="gemini-embedding-001")
 EMBEDDING_DIM_GEMINI = 3072
 
+# Local embedding setup
+local_model = get_registry().get("sentence-transformers").create(
+    name="all-mpnet-base-v2"
+)
+EMBEDDING_DIM_MPNET = 768
+
 
 class TranscriptGeminiWhole(LanceModel):
     """Whole-document transcript with Gemini embeddings (3072-dim).
@@ -37,17 +43,17 @@ class TranscriptGeminiWhole(LanceModel):
     embedding_dim: int = Field(default=3072)
 
 
-class TranscriptMpnetWhole(LanceModel):
+class TranscriptLocalWhole(LanceModel):
     """Whole-document transcript with SentenceTransformers mpnet embeddings (768-dim).
     
-    Uses local all-mpnet-base-v2 model (no API required).
-    Use ingestion_mpnet_whole.py to populate.
+    Uses local model (no API required). Embeddings are computed by LanceDB.
+    Use ingestion_mpnet_whole.py to populate. Supports search(query=...) directly.
     """
     md_id: str
     filepath: str
     filename: str = Field(description="stem of the file without suffix")
-    content: str
-    embedding: Vector(768)
+    content: str = local_model.SourceField()
+    embedding: Vector(EMBEDDING_DIM_MPNET) = local_model.VectorField()
     embedding_model: str = Field(default="all-mpnet-base-v2")
     embedding_provider: str = Field(default="sentence-transformers")
     embedding_dim: int = Field(default=768)
