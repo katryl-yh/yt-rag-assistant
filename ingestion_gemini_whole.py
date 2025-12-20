@@ -32,9 +32,6 @@ def ingest_mds_to_vector_db(table, data_path: Path):
                     "filepath": str(file),
                     "filename": file.stem,
                     "content": content,
-                    "embedding_model": "gemini-embedding-001",
-                    "embedding_provider": "google-genai",
-                    "embedding_dim": 3072,
                 }
             ]
         )
