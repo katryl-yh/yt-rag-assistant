@@ -1,9 +1,11 @@
+import os
 from pydantic_ai import Agent
 from backend.data_models import RagResponse
 from backend.constants import VECTOR_DATABASE_PATH
 import lancedb
 
-vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH)
+db_type = os.getenv("RAG_DB_TYPE", "whole")
+vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / f"transcripts_gemini_{db_type}")
 
 rag_agent = Agent(
     model="google-gla:gemini-2.5-flash",
