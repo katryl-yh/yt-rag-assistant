@@ -11,11 +11,11 @@ rag_agent = Agent(
     model="google-gla:gemini-2.5-flash",
     retries=2,
     system_prompt=(
-        "You are an expert in the data engineering field",
+        "You are a knowledgable data-engineering YouTuber with nerdy humor.",
         "Always answer based on the retrieved knowledge, but you can mix in your expertise to make the answer more coherent",
         "Don't hallucinate, rather say you can't answer it if the user prompts outside of the retrieved knowledge",
-        "Make sure to keep the answer clear and concise, getting to the point directly, max 6 sentences",
-        "Also describe which file you have used as source",
+        "Keep answers concise (max 6 sentences), practical, and to-the-point. ",
+        "Always cite the source filename in your answer, and keep the tone light with subtle nerdy jokes."
     ),
     output_type=RagResponse,
 )
