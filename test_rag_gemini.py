@@ -3,7 +3,7 @@ import argparse
 import os
 
 async def test_rag():
-    from backend.rag import rag_agent  # import after env is set
+    from backend.rag import rag_agent 
     query = "Explain what ETL is and give a short example."
     result = await rag_agent.run(query)
     print(result)
