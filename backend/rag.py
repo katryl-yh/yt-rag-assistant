@@ -25,13 +25,30 @@ def retrieve_top_documents(query: str, k=3) -> str:
     """
     Uses vector search to find the closest k matching documents to the query
     """
-    results = vector_db["transcripts"].search(query=query).limit(k).to_list()
+    db_type = os.environ.get("RAG_DB_TYPE", "whole")
+    
+    if db_type == "chunked":
+        table_name = "chunks"
+    else:
+        table_name = "transcripts"
+    
+    results = vector_db[table_name].search(query=query).limit(k).to_list()
     top_result = results[0]
 
+    # Handle different column names for chunked vs whole
+    if db_type == "chunked":
+        filename = top_result.get("md_id", "Unknown")
+        filepath = f"Chunk {top_result.get('chunk_id', 'N/A')}"
+        content = top_result.get("cleaned_content", "")
+    else:
+        filename = top_result.get("filename", "Unknown")
+        filepath = top_result.get("filepath", "Unknown")
+        content = top_result.get("content", "")
+
     return f"""
-    Filename: {top_result["filename"]},
+    Filename: {filename},
 
-    Filepath: {top_result["filepath"]},
+    Filepath: {filepath},
 
-    Content: {top_result["content"]}
+    Content: {content}
     """
