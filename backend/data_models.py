@@ -2,7 +2,7 @@
 
 Defines LanceDB schemas for embedding providers and ingestion strategies:
 - TranscriptGeminiWhole: Gemini embeddings (3072-dim), whole-document
-
+- TranscriptGeminiChunk: Two-stream chunk model (raw + cleaned versions)
 Shared models:
 - Prompt: user query input
 - RagResponse: structured LLM response with sources
@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from lancedb.embeddings import get_registry
 from lancedb.pydantic import LanceModel, Vector
 from dotenv import load_dotenv
+from typing import Optional
 
 load_dotenv()
 
@@ -35,9 +36,17 @@ class TranscriptGeminiWhole(LanceModel):
     embedding_dim: int = Field(default=3072)
 
 
-# Placeholder for future chunk-level models
-# class TranscriptGeminiChunk(LanceModel):
-#     """Chunk-level transcript with Gemini embeddings."""
+class TranscriptGeminiChunk(LanceModel):
+    """Two-stream chunk: raw (for vector) + cleaned (for LLM)."""
+    md_id: str
+    chunk_id: int
+    raw_content: str = embedding_model.SourceField()   # used for embeddings
+    cleaned_content: str = Field(description="Heavily cleaned for LLM context")
+    token_count: int = Field(description="Approximate token count from tiktoken")
+    embedding: Optional[Vector(EMBEDDING_DIM_GEMINI)] = embedding_model.VectorField(default=None)
+    embedding_model: str = Field(default="gemini-embedding-001")
+    embedding_provider: str = Field(default="google-genai")
+    embedding_dim: int = Field(default=3072)
 
 
 class Prompt(BaseModel):
