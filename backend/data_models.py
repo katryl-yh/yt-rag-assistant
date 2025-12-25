@@ -55,6 +55,7 @@ class TranscriptGeminiChunk(LanceModel):
 class Prompt(BaseModel):
     """User query input for RAG system."""
     prompt: str = Field(description="prompt from user, if empty consider it as missing")
+    retrieval_mode: str = Field(default="chunked", description="'chunked' for granular results or 'whole' for full document context")
 
 
 class RagResponse(BaseModel):
