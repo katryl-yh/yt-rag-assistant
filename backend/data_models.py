@@ -22,7 +22,7 @@ EMBEDDING_DIM_GEMINI = 768  # text-embedding-004 is 768-dim
 
 
 class TranscriptGeminiWhole(LanceModel):
-    """Whole-document transcript with Gemini embeddings (3072-dim).
+    """Whole-document transcript with Gemini embeddings.
     
     Requires Gemini API credentials and embedding registry configured.
     Use ingestion_gemini_whole.py to populate.
@@ -35,7 +35,7 @@ class TranscriptGeminiWhole(LanceModel):
     keywords: str = Field(description="stores 20-40 keywords about a particular video")
     embedding: Optional[Vector(EMBEDDING_DIM_GEMINI)] = embedding_model.VectorField(default=None)
     embedding_model: str = Field(default=EMBEDDING_MODEL_NAME)
-    embedding_provider: str = Field(default="google-genai")
+    embedding_provider: str = Field(default="google-generativeai")
     embedding_dim: int = Field(default=EMBEDDING_DIM_GEMINI)
 
 
