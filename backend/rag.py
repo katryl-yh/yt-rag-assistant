@@ -4,8 +4,8 @@ from backend.data_models import RagResponse
 from backend.constants import VECTOR_DATABASE_PATH
 import lancedb
 
-db_type = os.getenv("RAG_DB_TYPE", "whole")
-vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / f"transcripts_gemini_{db_type}")
+# Connect to unified database
+vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / "transcripts_unified")
 
 rag_agent = Agent(
     model="google-gla:gemini-2.5-flash",
@@ -23,32 +23,26 @@ rag_agent = Agent(
 @rag_agent.tool_plain
 def retrieve_top_documents(query: str, k=3) -> str:
     """
-    Uses vector search to find the closest k matching documents to the query
+    Uses vector search on chunks for granular retrieval.
+    The unified database uses token-based chunking for better context retrieval.
     """
-    db_type = os.environ.get("RAG_DB_TYPE", "whole")
+    results = vector_db["video_chunks"].search(query=query).limit(k).to_list()
     
-    if db_type == "chunked":
-        table_name = "chunks"
-    else:
-        table_name = "transcripts"
+    if not results:
+        return "No relevant documents found."
     
-    results = vector_db[table_name].search(query=query).limit(k).to_list()
     top_result = results[0]
-
-    # Handle different column names for chunked vs whole
-    if db_type == "chunked":
-        filename = top_result.get("md_id", "Unknown")
-        filepath = f"Chunk {top_result.get('chunk_id', 'N/A')}"
-        content = top_result.get("cleaned_content", "")
-    else:
-        filename = top_result.get("filename", "Unknown")
-        filepath = top_result.get("filepath", "Unknown")
-        content = top_result.get("content", "")
+    
+    # Extract information from chunk record
+    md_id = top_result.get("md_id", "Unknown")
+    chunk_id = top_result.get("chunk_id", 0)
+    filepath = f"Chunk {chunk_id}"
+    content = top_result.get("cleaned_content", "")
 
     return f"""
-    Filename: {filename},
+    Video ID: {md_id},
 
-    Filepath: {filepath},
+    Location: {filepath},
 
     Content: {content}
     """
