@@ -12,12 +12,13 @@ from lancedb.embeddings import get_registry
 from lancedb.pydantic import LanceModel, Vector
 from dotenv import load_dotenv
 from typing import Optional
+from backend.constants import EMBEDDING_MODEL_NAME
 
 load_dotenv()
 
 # Gemini embedding setup
-embedding_model = get_registry().get("gemini-text").create(name="gemini-embedding-001")
-EMBEDDING_DIM_GEMINI = 3072
+embedding_model = get_registry().get("gemini-text").create(name=EMBEDDING_MODEL_NAME)
+EMBEDDING_DIM_GEMINI = 768  # text-embedding-004 is 768-dim
 
 
 class TranscriptGeminiWhole(LanceModel):
@@ -30,10 +31,12 @@ class TranscriptGeminiWhole(LanceModel):
     filepath: str
     filename: str = Field(description="stem of the file without suffix")
     content: str = embedding_model.SourceField()
-    embedding: Vector(EMBEDDING_DIM_GEMINI) = embedding_model.VectorField()
-    embedding_model: str = Field(default="gemini-embedding-001")
+    summary: str = Field(description="summary of the video based on whole stranscipt")
+    keywords: str = Field(description="stores 20-40 keywords about a particular video")
+    embedding: Optional[Vector(EMBEDDING_DIM_GEMINI)] = embedding_model.VectorField(default=None)
+    embedding_model: str = Field(default=EMBEDDING_MODEL_NAME)
     embedding_provider: str = Field(default="google-genai")
-    embedding_dim: int = Field(default=3072)
+    embedding_dim: int = Field(default=EMBEDDING_DIM_GEMINI)
 
 
 class TranscriptGeminiChunk(LanceModel):
@@ -44,9 +47,9 @@ class TranscriptGeminiChunk(LanceModel):
     cleaned_content: str = Field(description="Heavily cleaned for LLM context")
     token_count: int = Field(description="Approximate token count from tiktoken")
     embedding: Optional[Vector(EMBEDDING_DIM_GEMINI)] = embedding_model.VectorField(default=None)
-    embedding_model: str = Field(default="gemini-embedding-001")
+    embedding_model: str = Field(default=EMBEDDING_MODEL_NAME)
     embedding_provider: str = Field(default="google-genai")
-    embedding_dim: int = Field(default=3072)
+    embedding_dim: int = Field(default=EMBEDDING_DIM_GEMINI)
 
 
 class Prompt(BaseModel):
@@ -59,3 +62,20 @@ class RagResponse(BaseModel):
     filename: str = Field(description="filename of retrieved file without suffix")
     filepath: str = Field(description="absolute path to the retrieved file")
     answer: str = Field(description="answer based on the retrieved file")
+
+
+class VideoMetadata(BaseModel):
+    """LLM-generated metadata for a video transcript.
+    
+    Used to structure Gemini's response when generating summary and keywords.
+    """
+    summary: str = Field(description="1-3 sentence summary suitable for YouTube description")
+    keywords: str = Field(description="20-40 comma-separated keywords for YouTube tags")
+
+
+class VideoMetadataResponse(BaseModel):
+    """API response model for video metadata endpoints."""
+    md_id: str = Field(description="unique hash identifier for the video")
+    filename: str = Field(description="original filename without extension")
+    summary: str = Field(description="video summary")
+    keywords: str = Field(description="comma-separated keywords")
