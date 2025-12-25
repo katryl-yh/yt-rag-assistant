@@ -212,5 +212,7 @@ data_cleaned
 knowledge_base
 
 # Skip personal settings
-
 settings.json
+
+# Ingestion checkpoint (runtime state, changes on every run)
+ingestion_checkpoint.json
