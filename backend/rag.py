@@ -7,6 +7,9 @@ import lancedb
 # Connect to unified database
 vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / "transcripts_unified")
 
+# Store retrieval mode in a context variable (will be set by API)
+_retrieval_mode = "chunked"
+
 rag_agent = Agent(
     model="google-gla:gemini-2.5-flash",
     retries=2,
@@ -23,26 +26,53 @@ rag_agent = Agent(
 @rag_agent.tool_plain
 def retrieve_top_documents(query: str, k=3) -> str:
     """
-    Uses vector search on chunks for granular retrieval.
-    The unified database uses token-based chunking for better context retrieval.
+    Uses vector search to retrieve relevant documents.
+    Retrieval mode determines source: 'chunked' uses granular chunks, 'whole' uses full documents.
     """
-    results = vector_db["video_chunks"].search(query=query).limit(k).to_list()
+    global _retrieval_mode
     
-    if not results:
-        return "No relevant documents found."
-    
-    top_result = results[0]
-    
-    # Extract information from chunk record
-    md_id = top_result.get("md_id", "Unknown")
-    chunk_id = top_result.get("chunk_id", 0)
-    filepath = f"Chunk {chunk_id}"
-    content = top_result.get("cleaned_content", "")
+    if _retrieval_mode == "whole":
+        # Query whole documents for broader context
+        results = vector_db["parent_videos"].search(query=query).limit(k).to_list()
+        
+        if not results:
+            return "No relevant documents found."
+        
+        top_result = results[0]
+        md_id = top_result.get("md_id", "Unknown")
+        filename = top_result.get("filename", "Unknown")
+        filepath = top_result.get("filepath", "Unknown")
+        content = top_result.get("content", "")
+        
+        return f"""
+    Filename: {filename},
 
-    return f"""
+    Filepath: {filepath},
+
+    Content: {content}
+    """
+    else:
+        # Query chunks for granular retrieval (default)
+        results = vector_db["video_chunks"].search(query=query).limit(k).to_list()
+        
+        if not results:
+            return "No relevant documents found."
+        
+        top_result = results[0]
+        md_id = top_result.get("md_id", "Unknown")
+        chunk_id = top_result.get("chunk_id", 0)
+        filepath = f"Chunk {chunk_id}"
+        content = top_result.get("cleaned_content", "")
+        
+        return f"""
     Video ID: {md_id},
 
     Location: {filepath},
 
     Content: {content}
     """
+
+def set_retrieval_mode(mode: str):
+    """Set the retrieval mode for the RAG agent."""
+    global _retrieval_mode
+    _retrieval_mode = mode
