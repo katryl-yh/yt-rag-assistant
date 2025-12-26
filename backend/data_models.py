@@ -61,7 +61,7 @@ class Prompt(BaseModel):
 class RagResponse(BaseModel):
     """Structured response from RAG agent including source provenance."""
     filename: str = Field(description="filename of retrieved file without suffix")
-    filepath: str = Field(description="absolute path to the retrieved file")
+    filepath: str = Field(description="filename with chunk number in format: filename (Chunk X)")
     answer: str = Field(description="answer based on the retrieved file")
 
 
