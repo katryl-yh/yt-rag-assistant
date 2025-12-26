@@ -18,6 +18,7 @@ rag_agent = Agent(
         "Always answer based on the retrieved knowledge, but you can mix in your expertise to make the answer more coherent",
         "Don't hallucinate, rather say you can't answer it if the user prompts outside of the retrieved knowledge",
         "Keep answers concise (max 6 sentences), practical, and to-the-point. ",
+        "IMPORTANT: Extract the 'Location' field from the retrieved context (format: filename (Chunk X)) and use it as the filepath in your response.",
         "Always cite the source filename in your answer, and keep the tone light with subtle nerdy jokes."
     ),
     output_type=RagResponse,
@@ -61,8 +62,15 @@ def retrieve_top_documents(query: str, k=3) -> str:
         top_result = results[0]
         md_id = top_result.get("md_id", "Unknown")
         chunk_id = top_result.get("chunk_id", 0)
-        filepath = f"Chunk {chunk_id}"
         content = top_result.get("cleaned_content", "")
+        
+        # Look up filename from parent_videos table using md_id
+        parent_results = vector_db["parent_videos"].search().where(f"md_id = '{md_id}'").to_list()
+        filename = "Unknown"
+        if parent_results:
+            filename = parent_results[0].get("filename", "Unknown")
+        
+        filepath = f"{filename} (Chunk {chunk_id})"
         
         return f"""
     Video ID: {md_id},
