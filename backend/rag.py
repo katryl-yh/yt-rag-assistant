@@ -1,7 +1,7 @@
 import os
 from pydantic_ai import Agent
 from backend.data_models import RagResponse
-from backend.constants import VECTOR_DATABASE_PATH
+from backend.constants import VECTOR_DATABASE_PATH, LLM_MODEL_NAME
 import lancedb
 
 # Connect to unified database
@@ -11,7 +11,7 @@ vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / "transcripts_unified")
 _retrieval_mode = "chunked"
 
 rag_agent = Agent(
-    model="google-gla:gemini-2.5-flash",
+    model=LLM_MODEL_NAME,
     retries=2,
     system_prompt=(
         "You are a knowledgable data-engineering YouTuber with nerdy humor.",
