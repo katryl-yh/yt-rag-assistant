@@ -1,32 +1,103 @@
 import streamlit as st
 import requests
-from pathlib import Path
+from rag_bot import RAGBot
 
-ASSETS_PATH = Path(__file__).absolute().parents[1] / "assets"
 API_BASE_URL = "http://127.0.0.1:8000"
 
-@st.cache_data
+
+def init_session_states():
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "bot" not in st.session_state:
+        st.session_state.bot = None
+    if "retrieval_mode" not in st.session_state:
+        st.session_state.retrieval_mode = "chunked"
+
+
+@st.cache_data(ttl=600)
 def fetch_videos():
     """Fetch all available videos from the API"""
     try:
         response = requests.get(f"{API_BASE_URL}/videos")
-        data = response.json()
-        return {v["filename"]: v["md_id"] for v in data["videos"]}
+        if response.status_code == 200:
+            data = response.json()
+            return {v["filename"]: v["md_id"] for v in data["videos"]}
+        return {}
     except Exception as e:
         st.error(f"Failed to fetch videos: {e}")
         return {}
 
+
+@st.cache_data(ttl=3600)
+def fetch_video_metadata(video_id):
+    """Fetch description and keywords for a video"""
+    desc = "No description available"
+    keywords = ""
+    
+    try:
+        # Description
+        desc_response = requests.get(f"{API_BASE_URL}/video/description/{video_id}")
+        if desc_response.status_code == 200:
+            desc_data = desc_response.json()
+            # Handle potential key variations (summary vs description)
+            desc = desc_data.get("summary") or desc_data.get("description", "No description available")
+            
+        # Keywords
+        kw_response = requests.get(f"{API_BASE_URL}/video/keywords/{video_id}")
+        if kw_response.status_code == 200:
+            kw_data = kw_response.json()
+            keywords = kw_data.get("keywords", "")
+            
+    except Exception:
+        pass
+        
+    return desc, keywords
+
+
+def display_chat_messages():
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if message.get("source"):
+                st.caption(f"📍 Source: {message['source']}")
+
+
+def handle_user_input():
+    if prompt := st.chat_input("Ask a question"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            
+        with st.spinner("Thinking..."):
+            bot_response = st.session_state.bot.chat(prompt)
+        
+        with st.chat_message("assistant"):
+            st.markdown(bot_response["bot"])
+            st.caption(f"📍 Source: {bot_response['source']}")
+        
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": bot_response["bot"],
+            "source": bot_response["source"]
+        })
+
+
 def layout():
     st.set_page_config(page_title="YT RAG Assistant", layout="wide")
-    
     st.markdown("# YT RAG Assistant")
-    st.markdown("Ask questions about YouTube video transcripts or explore video metadata")
     
-    # Sidebar for video selection and metadata
     with st.sidebar:
-        st.markdown("## 📺 Video Explorer")
+        st.header("Settings")
+        retrieval_mode = st.radio("Retrieval mode:", ["chunked", "whole"])
+        if retrieval_mode != st.session_state.retrieval_mode:
+            st.session_state.retrieval_mode = retrieval_mode
+            st.session_state.bot = RAGBot(retrieval_mode=retrieval_mode)
+            st.session_state.messages = []
+            
+        st.markdown("---")
+        st.header("📺 Video Explorer")
         
-        # Fetch videos
         videos = fetch_videos()
         
         if videos:
@@ -38,73 +109,26 @@ def layout():
             
             if selected_filename:
                 video_id = videos[selected_filename]
+                desc, keywords = fetch_video_metadata(video_id)
                 
-                # Fetch and display video description
-                try:
-                    desc_response = requests.get(f"{API_BASE_URL}/video/description/{video_id}")
-                    desc_data = desc_response.json()
-                    
-                    st.markdown("### 📝 Description")
-                    st.info(desc_data.get("summary", "No description available"))
-                except Exception as e:
-                    st.error(f"Failed to fetch description: {e}")
+                st.markdown("### 📝 Description")
+                st.info(desc)
                 
-                # Fetch and display video keywords
-                try:
-                    kw_response = requests.get(f"{API_BASE_URL}/video/keywords/{video_id}")
-                    kw_data = kw_response.json()
-                    
-                    st.markdown("### 🏷️ Keywords/Tags")
-                    keywords = kw_data.get("keywords", "")
-                    if keywords:
-                        st.caption(keywords)
-                    else:
-                        st.caption("No keywords available")
-                except Exception as e:
-                    st.error(f"Failed to fetch keywords: {e}")
+                st.markdown("### 🏷️ Keywords")
+                if keywords:
+                    st.caption(keywords)
+                else:
+                    st.caption("No keywords available")
         else:
-            st.warning("⚠️ No videos available. Please run the ingestion pipeline first.")
+            st.warning("⚠️ No videos available.")
     
-    # Main content area for RAG query
-    st.markdown("## 🔍 Ask a Question")
+    if st.session_state.bot is None:
+        st.session_state.bot = RAGBot(retrieval_mode=st.session_state.retrieval_mode)
     
-    col1, col2 = st.columns([3, 1])
-    
-    with col2:
-        # Retrieval mode selector
-        retrieval_mode = st.radio(
-            "Retrieval mode:",
-            options=["chunked", "whole"],
-            help="Chunked: Focused results | Whole: Full document context"
-        )
-    
-    with col1:
-        # Question input
-        text_input = st.text_input(label="Your question", placeholder="e.g., How does FastAPI work?")
-    
-    if st.button("Send", use_container_width=True) and text_input.strip() != "":
-        try:
-            response = requests.post(
-                f"{API_BASE_URL}/rag/query",
-                json={"prompt": text_input, "retrieval_mode": retrieval_mode}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                st.markdown("---")
-                st.markdown("### ❓ Question:")
-                st.markdown(f"*{text_input}*")
-                
-                st.markdown("### ✅ Answer:")
-                st.markdown(data["answer"])
-                
-                st.markdown("### 📍 Source:")
-                st.code(data["filepath"])
-            else:
-                st.error(f"API error: {response.status_code}")
-        except Exception as e:
-            st.error(f"Failed to get response: {e}")
+    display_chat_messages()
+    handle_user_input()
+
 
 if __name__ == "__main__":
+    init_session_states()
     layout()
