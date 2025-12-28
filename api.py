@@ -8,16 +8,22 @@ import uuid
 from fastapi import HTTPException
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import UserPromptPart, ModelResponse, TextPart
+import time
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
 # In-memory session storage for conversation history
 sessions = {}  # {session_id: [{"role": "user", "content": "..."}, ...]}
+SESSION_TTL_MINUTES = 60  # Clean up sessions older than 1 hour
 
 def get_or_create_session() -> str:
     """Create a new session ID for tracking conversation history"""
     session_id = str(uuid.uuid4())
-    sessions[session_id] = []
+    sessions[session_id] = {
+        "history": [], 
+        "created_at": time.time()  # Add this line
+    }
     return session_id
 
 # Initialize unified vector database
@@ -124,6 +130,7 @@ async def query_documentation(query: Prompt):
 @app.post("/query")
 async def query_rag(request: QueryRequest):
     """Query RAG using server-side session history"""
+    cleanup_old_sessions()  # ← Add this single line here
     set_retrieval_mode(request.retrieval_mode)
     
     # 1. Validate Session
@@ -131,7 +138,7 @@ async def query_rag(request: QueryRequest):
          raise HTTPException(status_code=404, detail="Session not found")
 
     # 2. Get History from Server Memory and convert to proper message format
-    server_history = sessions[request.session_id]
+    server_history = sessions[request.session_id]["history"]
     message_history = []
     for msg in server_history:
         if msg["role"] == "user":
@@ -157,10 +164,10 @@ async def query_rag(request: QueryRequest):
         raise  # Re-raise other HTTP errors
     
     # 4. Update Server Memory
-    sessions[request.session_id].append({"role": "user", "content": request.query})
+    sessions[request.session_id]["history"].append({"role": "user", "content": request.query})
     
     # CHANGED: Use 'model' role and remove extra fields to keep history clean for the LLM
-    sessions[request.session_id].append({
+    sessions[request.session_id]["history"].append({
         "role": "model", 
         "content": result.output.answer
     })
@@ -239,6 +246,26 @@ async def get_session_history(session_id: str) -> dict:
     
     return {
         "session_id": session_id,
-        "history": sessions[session_id],
-        "message_count": len(sessions[session_id])
+        "history": sessions[session_id]["history"],
+        "message_count": len(sessions[session_id]["history"])
     }
+
+@app.post("/session/{session_id}/clear")
+async def clear_session(session_id: str):
+    """Manually clear a session"""
+    if session_id in sessions:
+        del sessions[session_id]
+        return {"message": f"Session {session_id} cleared"}
+    return {"message": f"Session {session_id} not found"}
+
+
+def cleanup_old_sessions():
+    """Remove sessions older than SESSION_TTL_MINUTES"""
+    current_time = time.time()
+    expired_sessions = [
+        sid for sid, data in sessions.items()
+        if current_time - data["created_at"] > SESSION_TTL_MINUTES * 60
+    ]
+    for sid in expired_sessions:
+        del sessions[sid]
+    return len(expired_sessions)
