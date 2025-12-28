@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from backend.rag import rag_agent, set_retrieval_mode
 from backend.data_models import Prompt, QueryRequest, VideoMetadataResponse
-from backend.constants import VECTOR_DATABASE_PATH
+from backend.constants import VECTOR_DATABASE_PATH, GEMINI_MODELS, GEMINI_MODEL_KEY
 import lancedb
 from typing import Optional, List
 import uuid
 from fastapi import HTTPException
+from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.messages import UserPromptPart, ModelResponse, TextPart
 
 app = FastAPI()
 
@@ -128,12 +130,31 @@ async def query_rag(request: QueryRequest):
     if request.session_id not in sessions:
          raise HTTPException(status_code=404, detail="Session not found")
 
-    # 2. Get History from Server Memory
+    # 2. Get History from Server Memory and convert to proper message format
     server_history = sessions[request.session_id]
+    message_history = []
+    for msg in server_history:
+        if msg["role"] == "user":
+            message_history.append(UserPromptPart(content=msg["content"]))
+        elif msg["role"] == "model":
+            message_history.append(ModelResponse(parts=[TextPart(content=msg["content"])]))
     
-    # 3. Run Agent
-    # PydanticAI will use the server_history to understand context
-    result = await rag_agent.run(request.query, message_history=server_history)
+    # 3. Run Agent with 429 error handling
+    try:
+        result = await rag_agent.run(request.query, message_history=message_history)
+    except ModelHTTPError as e:
+        if e.status_code == 429:
+            # Quota exceeded: provide helpful fallback guidance
+            current_model = GEMINI_MODEL_KEY
+            available_high_quota = [k for k, v in GEMINI_MODELS.items() if k != current_model]
+            raise HTTPException(
+                status_code=429,
+                detail=f"Quota exceeded for model '{current_model}'. "
+                       f"Switch to a high-quota model in .env (GEMINI_MODEL_KEY): {', '.join(available_high_quota)}. "
+                       f"Recommended: 'flash-lite' or 'flash-2.0' (10M tokens/day each). "
+                       f"Restart your server after changing .env."
+            )
+        raise  # Re-raise other HTTP errors
     
     # 4. Update Server Memory
     sessions[request.session_id].append({"role": "user", "content": request.query})
