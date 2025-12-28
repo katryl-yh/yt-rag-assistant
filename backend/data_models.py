@@ -58,12 +58,21 @@ class Prompt(BaseModel):
     retrieval_mode: str = Field(default="chunked", description="'chunked' for granular results or 'whole' for full document context")
 
 
+class QueryRequest(BaseModel):
+    """Request model for RAG query. History is managed by the server via session_id."""
+    query: str = Field(description="user question")
+    retrieval_mode: str = Field(default="chunked", description="'chunked' or 'whole'")
+    session_id: str = Field(..., description="session ID is now required") 
+
+
 class RagResponse(BaseModel):
     """Structured response from RAG agent including source provenance."""
     filename: str = Field(description="filename of retrieved file without suffix")
-    filepath: str = Field(description="filename with chunk number in format: filename (Chunk X)")
+    
+    # CHANGED: Added conditional logic to the description
+    filepath: str = Field(description="The source identifier. IF retrieving specific chunks (chunked mode), use format 'filename (Chunk X)'. IF retrieving the whole document (whole mode), use just the 'filename'.")
+    
     answer: str = Field(description="answer based on the retrieved file")
-
 
 class VideoMetadata(BaseModel):
     """LLM-generated metadata for a video transcript.
