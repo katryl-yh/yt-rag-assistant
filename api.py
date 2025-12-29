@@ -27,7 +27,19 @@ def get_or_create_session() -> str:
     return session_id
 
 # Initialize unified vector database
-vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / "transcripts_unified")
+# vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / "transcripts_unified")
+vector_db = None
+
+def get_vector_db():
+    global vector_db
+    if vector_db is None:
+        vector_db = lancedb.connect(uri=VECTOR_DATABASE_PATH / "transcripts_unified")
+    return vector_db
+
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint"""
+    return {"status": "ok", "timestamp": time.time()}
 
 @app.get("/")
 async def hello_message():
@@ -38,10 +50,10 @@ async def hello_message():
             "GET /videos": "List all available videos with their md_id (video identifier) and filename",
             "GET /video/description/{md_id}": "Get the pre-generated YouTube description for a video",
             "GET /video/keywords/{md_id}": "Get the pre-generated YouTube keywords/tags for a video",
-            "POST /session": "Create a new conversation session",
-            "GET /sessions": "List all active session IDs",
-            "POST /query": "Query the RAG system with a custom question about the videos",
-            "GET /history/{session_id}": "Get conversation history for a session"
+            "POST /session": "[LEGACY] Create a session (optional - history managed by frontend)",
+            "GET /sessions": "[LEGACY] List sessions (optional - for compatibility)",
+            "POST /query": "Query the RAG system with history from frontend (stateless)",
+            "POST /history": "Receive and return conversation history from frontend"
         }
     }
 
@@ -67,7 +79,8 @@ async def list_all_videos():
     Returns:
         List of videos with their md_id (video identifier) and filename
     """
-    parent_table = vector_db["parent_videos"]
+    db = get_vector_db()
+    parent_table = db["parent_videos"]
     results = parent_table.search().limit(1000).to_list()
     
     videos = [
@@ -91,7 +104,8 @@ async def list_all_keywords():
     Returns:
         Sorted list of unique keywords with their frequency count
     """
-    parent_table = vector_db["parent_videos"]
+    db = get_vector_db()
+    parent_table = db["parent_videos"]
     results = parent_table.search().limit(1000).to_list()
     
     keyword_counts = {}
@@ -129,24 +143,19 @@ async def query_documentation(query: Prompt):
 
 @app.post("/query")
 async def query_rag(request: QueryRequest):
-    """Query RAG using server-side session history"""
-    cleanup_old_sessions()  # ← Add this single line here
+    """Query RAG with history from frontend (stateless approach)"""
     set_retrieval_mode(request.retrieval_mode)
     
-    # 1. Validate Session
-    if request.session_id not in sessions:
-         raise HTTPException(status_code=404, detail="Session not found")
-
-    # 2. Get History from Server Memory and convert to proper message format
-    server_history = sessions[request.session_id]["history"]
+    # Convert history from frontend to proper message format for the agent
     message_history = []
-    for msg in server_history:
+    for msg in request.history:
         if msg["role"] == "user":
             message_history.append(UserPromptPart(content=msg["content"]))
-        elif msg["role"] == "model":
+        elif msg["role"] == "assistant" or msg["role"] == "model":
+            # Handle both 'assistant' (from frontend) and 'model' (legacy)
             message_history.append(ModelResponse(parts=[TextPart(content=msg["content"])]))
     
-    # 3. Run Agent with 429 error handling
+    # Run Agent with 429 error handling
     try:
         result = await rag_agent.run(request.query, message_history=message_history)
     except ModelHTTPError as e:
@@ -163,15 +172,7 @@ async def query_rag(request: QueryRequest):
             )
         raise  # Re-raise other HTTP errors
     
-    # 4. Update Server Memory
-    sessions[request.session_id]["history"].append({"role": "user", "content": request.query})
-    
-    # CHANGED: Use 'model' role and remove extra fields to keep history clean for the LLM
-    sessions[request.session_id]["history"].append({
-        "role": "model", 
-        "content": result.output.answer
-    })
-    
+    # No server-side history storage - frontend manages it
     return result.output
 
 @app.get("/video/description/{video_id}")
@@ -186,7 +187,8 @@ async def get_video_description(video_id: str):
         VideoMetadataResponse with summary field populated
     """
     # Retrieve the transcript from parent_videos table
-    parent_table = vector_db["parent_videos"]
+    db = get_vector_db()
+    parent_table = db["parent_videos"]
     results = parent_table.search().where(f"md_id = '{video_id}'").to_list()
     
     if not results:
@@ -218,7 +220,8 @@ async def get_video_keywords(video_id: str):
         VideoMetadataResponse with keywords field populated (comma-separated)
     """
     # Retrieve the transcript from parent_videos table
-    parent_table = vector_db["parent_videos"]
+    db = get_vector_db()
+    parent_table = db["parent_videos"]
     results = parent_table.search().where(f"md_id = '{video_id}'").to_list()
     
     if not results:
@@ -237,17 +240,17 @@ async def get_video_keywords(video_id: str):
         keywords=keywords
     )
 
-@app.get("/history/{session_id}")
-async def get_session_history(session_id: str) -> dict:
-    """Get conversation history for a session"""
-    # CHANGED: Raise proper 404 exception instead of returning 200 with error dict
-    if session_id not in sessions:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+@app.post("/history")
+async def receive_history(request: dict) -> dict:
+    """Receive and return conversation history from frontend.
     
+    This endpoint allows the frontend to track/display history via the API.
+    History is not stored on the backend - it's managed by the frontend.
+    """
+    history = request.get("history", [])
     return {
-        "session_id": session_id,
-        "history": sessions[session_id]["history"],
-        "message_count": len(sessions[session_id]["history"])
+        "history": history,
+        "message_count": len(history)
     }
 
 @app.post("/session/{session_id}/clear")
