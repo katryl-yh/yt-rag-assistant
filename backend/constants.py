@@ -1,7 +1,37 @@
 import os
+import shutil
 from pathlib import Path
+from dotenv import load_dotenv
 
-VECTOR_DATABASE_PATH = Path(__file__).parents[1] / "knowledge_base"
+load_dotenv()
+
+# Detect if running in Azure Functions
+IS_AZURE = os.getenv("WEBSITE_SITE_NAME") is not None
+
+# Define paths
+BASE_DIR = Path(__file__).parents[1]
+LOCAL_KNOWLEDGE_BASE = BASE_DIR / "knowledge_base"
+
+if IS_AZURE:
+    # In Azure, we must use /tmp for writable storage
+    # LanceDB needs to write lock files even for read operations
+    VECTOR_DATABASE_PATH = Path("/tmp/knowledge_base")
+    
+    # Copy the database to /tmp if it doesn't exist
+    # Note: /tmp is ephemeral in Azure Functions, so this runs on cold starts
+    if not VECTOR_DATABASE_PATH.exists():
+        try:
+            print(f"Copying knowledge base from {LOCAL_KNOWLEDGE_BASE} to {VECTOR_DATABASE_PATH}...")
+            shutil.copytree(LOCAL_KNOWLEDGE_BASE, VECTOR_DATABASE_PATH, dirs_exist_ok=True)
+            print("Copy complete.")
+        except Exception as e:
+            print(f"Error copying knowledge base: {e}")
+            # Fallback to local path (might fail due to read-only FS)
+            VECTOR_DATABASE_PATH = LOCAL_KNOWLEDGE_BASE
+    else:
+        print(f"Knowledge base already exists at {VECTOR_DATABASE_PATH}")
+else:
+    VECTOR_DATABASE_PATH = LOCAL_KNOWLEDGE_BASE
 
 # LLM Model Configuration
 # GEMINI_MODELS dictionary maps friendly model keys to their full provider-prefixed names.
