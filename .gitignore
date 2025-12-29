@@ -216,3 +216,22 @@ settings.json
 
 # Ingestion checkpoint (runtime state, changes on every run)
 ingestion_checkpoint.json
+
+.python_packages
+
+# Azure Functions artifacts
+bin
+obj
+appsettings.json
+local.settings.json
+
+# Azure Functions Core Tools
+.vscode/extensions.json
+
+# Python function app
+worker.config.json
+.python_packages/
+__blobstorage__/
+__queuestorage__/
+__azurite_db*__.json
+.azurite/
