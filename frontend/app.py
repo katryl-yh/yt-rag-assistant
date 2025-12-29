@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
+from config import build_api_url, get_api_base_url
 from rag_bot import RAGBot
 
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = get_api_base_url()
 
 
 def init_session_states():
@@ -18,12 +19,19 @@ def init_session_states():
 def fetch_videos():
     """Fetch all available videos from the API"""
     try:
-        response = requests.get(f"{API_BASE_URL}/videos")
+        url = build_api_url("videos")
+        print(f"Fetching videos from: {url}")  # Debug
+        response = requests.get(url)
+        print(f"Response status: {response.status_code}")  # Debug
         if response.status_code == 200:
             data = response.json()
+            print(f"Found {len(data['videos'])} videos")  # Debug
             return {v["filename"]: v["md_id"] for v in data["videos"]}
+        else:
+            print(f"Error response: {response.text}")  # Debug
         return {}
     except Exception as e:
+        print(f"Exception fetching videos: {e}")  # Debug
         st.error(f"Failed to fetch videos: {e}")
         return {}
 
@@ -36,14 +44,14 @@ def fetch_video_metadata(video_id):
     
     try:
         # Description
-        desc_response = requests.get(f"{API_BASE_URL}/video/description/{video_id}")
+        desc_response = requests.get(build_api_url(f"video/description/{video_id}"))
         if desc_response.status_code == 200:
             desc_data = desc_response.json()
             # Handle potential key variations (summary vs description)
             desc = desc_data.get("summary") or desc_data.get("description", "No description available")
             
         # Keywords
-        kw_response = requests.get(f"{API_BASE_URL}/video/keywords/{video_id}")
+        kw_response = requests.get(build_api_url(f"video/keywords/{video_id}"))
         if kw_response.status_code == 200:
             kw_data = kw_response.json()
             keywords = kw_data.get("keywords", "")
@@ -65,17 +73,17 @@ def display_chat_messages():
 def handle_user_input():
     if prompt := st.chat_input("Ask a question"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        
+
         with st.chat_message("user"):
             st.markdown(prompt)
-            
+
         with st.spinner("Thinking..."):
             bot_response = st.session_state.bot.chat(prompt)
-        
+
         with st.chat_message("assistant"):
             st.markdown(bot_response["bot"])
             st.caption(f"📍 Source: {bot_response['source']}")
-        
+
         st.session_state.messages.append({
             "role": "assistant",
             "content": bot_response["bot"],
