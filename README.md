@@ -40,6 +40,8 @@ Key API endpoints:
 - `GET /videos` (what’s in the KB)
 - `POST /query` (main chat endpoint; history comes from the frontend)
 
+Note: `POST /session` and `GET /sessions` are legacy endpoints from an earlier stateful prototype (server-side `session_id`). The current design is stateless: the frontend sends full `history` with each `POST /query`.
+
 ## Screenshots
 
 **Video Explorer**: list transcripts, then show per-video description + keywords after selection.
