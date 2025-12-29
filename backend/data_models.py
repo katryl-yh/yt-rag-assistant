@@ -1,7 +1,7 @@
 """Data models for RAG system.
 
 Defines LanceDB schemas for embedding providers and ingestion strategies:
-- TranscriptGeminiWhole: Gemini embeddings (3072-dim), whole-document
+- TranscriptGeminiWhole: Gemini embeddings (768-dim), whole-document
 - TranscriptGeminiChunk: Two-stream chunk model (raw + cleaned versions)
 Shared models:
 - Prompt: user query input
@@ -17,7 +17,15 @@ from backend.constants import EMBEDDING_MODEL_NAME
 load_dotenv()
 
 # Gemini embedding setup
-embedding_model = get_registry().get("gemini-text").create(name=EMBEDDING_MODEL_NAME)
+try:
+    embedding_model = get_registry().get("gemini-text").create(name=EMBEDDING_MODEL_NAME)
+except Exception as e:
+    print(f"WARNING: Failed to initialize embedding model: {e}")
+    print("If running on Azure, ensure GOOGLE_API_KEY is set in Environment Variables.")
+    # We re-raise because LanceModel definitions below depend on it.
+    # However, printing the error helps debugging in Log Stream.
+    raise
+
 EMBEDDING_DIM_GEMINI = 768  # text-embedding-004 is 768-dim
 
 
@@ -59,18 +67,22 @@ class Prompt(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    """Request model for RAG query. History is managed by the server via session_id."""
+    """Request model for RAG query with history from frontend (stateless)."""
     query: str = Field(description="user question")
     retrieval_mode: str = Field(default="chunked", description="'chunked' or 'whole'")
-    session_id: str = Field(..., description="session ID is now required") 
+    history: list[dict] = Field(default=[], description="conversation history from frontend") 
 
 
 class RagResponse(BaseModel):
     """Structured response from RAG agent including source provenance."""
-    filename: str = Field(description="filename of retrieved file without suffix")
-    
-    # CHANGED: Added conditional logic to the description
-    filepath: str = Field(description="The source identifier. IF retrieving specific chunks (chunked mode), use format 'filename (Chunk X)'. IF retrieving the whole document (whole mode), use just the 'filename'.")
+    filename: str = Field(description="Filename of the retrieved source (no extension), as shown in the retrieved context under 'Filename'.")
+
+    filepath: str = Field(
+        description=(
+            "Source citation string derived from the retrieved context (not an OS path). "
+            "In chunked mode, use 'filename (Chunk X)'. In whole mode, use just 'filename'."
+        )
+    )
     
     answer: str = Field(description="answer based on the retrieved file")
 
