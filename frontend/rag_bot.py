@@ -1,51 +1,43 @@
-from typing import Optional, List
-import os
+from typing import List
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
-
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+from config import get_api_base_url, build_api_url
 
 
 class RAGBot:
     def __init__(self, retrieval_mode: str = "chunked"):
-        self.api_url = API_BASE_URL  
+        self.api_url = get_api_base_url()
         self.retrieval_mode = retrieval_mode
-        self.message_history: List[dict] = []  # Store messages locally
-        self.session_id = self._create_session()  # Create new session on init
-
-    def _create_session(self) -> str:
-        """Create a new session on the backend"""
-        try:
-            response = requests.post(f"{API_BASE_URL}/session")
-            data = response.json()
-            return data.get("session_id", None)
-        except Exception as e:
-            print(f"Warning: Failed to create session: {e}")
-            return None
+        self.message_history: List[dict] = []  # Store messages locally in frontend
 
     def chat(self, user_query: str) -> dict:
-        """Send query to RAG API and return formatted response"""
+        """Send query to RAG API with conversation history and return formatted response"""
+        # Build payload with history from frontend
         payload = {
             "query": user_query,
             "retrieval_mode": self.retrieval_mode,
-            "session_id": self.session_id
+            "history": self.message_history  # Send full history to backend
         }
         
         try:
-            response = requests.post(f"{self.api_url}/query", json=payload)
+            response = requests.post(build_api_url("query"), json=payload, timeout=30)
             
-            # CHANGED: Check status code first
             if response.status_code != 200:
                 return {
                     "bot": f"⚠️ Error {response.status_code}: {response.text}",
                     "source": "API Error"
                 }
                 
+            result = response.json()
+            answer = result.get("answer", "No answer provided.")
+            source = result.get("filepath", "Unknown source")
+            
+            # Update local history after successful response
+            self.message_history.append({"role": "user", "content": user_query})
+            self.message_history.append({"role": "assistant", "content": answer})
+            
             return {
-                "bot": response.json().get("answer", "No answer provided."),
-                "source": response.json().get("filepath", "Unknown source")
+                "bot": answer,
+                "source": source
             }
             
         except requests.exceptions.RequestException as e:
@@ -55,6 +47,5 @@ class RAGBot:
             }
 
     def clear_history(self):
-        """Clear conversation history and create new session"""
+        """Clear conversation history"""
         self.message_history = []
-        self.session_id = self._create_session()
