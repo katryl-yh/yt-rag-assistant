@@ -32,7 +32,7 @@ from pydantic_ai import Agent
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import tiktoken
 
-from backend.constants import VECTOR_DATABASE_PATH, GEMINI_MODEL_NAME
+from backend.constants import VECTOR_DATABASE_PATH, LLM_MODEL_NAME
 from backend.data_models import (
     TranscriptGeminiWhole,
     TranscriptGeminiChunk,
@@ -108,7 +108,7 @@ def generate_md_id(filename: str) -> str:
 def create_metadata_agent() -> Agent:
     """Create PydanticAI agent for generating summary + keywords."""
     agent = Agent(
-        model=GEMINI_MODEL_NAME,
+        model=LLM_MODEL_NAME,
         retries=3,  # Retry on failures
         system_prompt=(
             "You are a YouTube content analyzer. Generate concise metadata for video transcripts.",
