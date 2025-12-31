@@ -79,8 +79,8 @@ class RagResponse(BaseModel):
 
     filepath: str = Field(
         description=(
-            "Source citation string derived from the retrieved context (not an OS path). "
-            "In chunked mode, use 'filename (Chunk X)'. In whole mode, use just 'filename'."
+            "Exact string found in the 'Filename' line of the retrieved context. "
+            "Do not add or remove anything. If it says '(Chunk X)', include it. If not, do not add it."
         )
     )
     

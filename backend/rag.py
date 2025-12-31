@@ -28,7 +28,7 @@ rag_agent = Agent(
         "You will see context blocks labeled [Result N]. If none of these blocks contain the asked entity/keywords, respond with the refusal line.",
         "Keep answers concise (max 6 sentences), practical, and to-the-point.",
         "Use the 'Filename' line from the retrieved context as your source identifier in the response.",
-        "If the context shows a chunk, keep the format 'filename (Chunk X)'. If it is whole-document retrieval, filename alone is enough.",
+        "Copy the 'Filename' line EXACTLY as it appears in the context into the 'filepath' field of the response. Do not invent chunk numbers if they are not present.",
         "Only cite a source if you found the answer in the retrieved context; otherwise just state you don't know. Keep the tone light with subtle nerdy jokes."
     ),
     output_type=RagResponse,
@@ -51,10 +51,9 @@ def retrieve_top_documents(query: str, k=3) -> str:
         blocks = []
         for idx, r in enumerate(results, 1):
             filename = r.get("filename", "Unknown")
-            filepath = r.get("filepath", "Unknown")
             content = r.get("content", "")
             blocks.append(
-                f"[Result {idx}]\nFilename: {filename}\nFilepath: {filepath}\nContent: {content}"
+                f"[Result {idx}]\nFilename: {filename}\nContent: {content}"
             )
         return "\n\n".join(blocks)
     else:  # chunked mode (default)
