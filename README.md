@@ -37,7 +37,7 @@ Streamlit UI (frontend/app.py)
 ```
 
 Key API endpoints:
-- `GET /videos` (what’s in the KB)
+- `GET /videos` (what’s in the Knowledge Base)
 - `POST /query` (main chat endpoint; history comes from the frontend)
 
 Note: `POST /session` and `GET /sessions` are legacy endpoints from an earlier stateful prototype (server-side `session_id`). The current design is stateless: the frontend sends full `history` with each `POST /query`.
@@ -64,7 +64,7 @@ Note: `POST /session` and `GET /sessions` are legacy endpoints from an earlier s
 ```bash
 # install deps (either is fine)
 uv pip install -r requirements.txt
-# or: python -m pip install -r requirements.txt
+
 
 # env
 copy .env.example .env
