@@ -7,7 +7,7 @@ Ingest Markdown transcripts, build a local LanceDB knowledge base, and chat with
 ## Highlights (what this lab demonstrates)
 
 - Deterministic preprocessing: SHA256 dedup + repeatable outputs
-- Clean + chunk transcripts for retrieval (token-aware splitting + overlap)
+- Clean + chunk transcripts for retrieval (token-aware splitting via `RecursiveCharacterTextSplitter`: 400 token chunks, 100 token overlap)
 - Unified LanceDB index in `knowledge_base/transcripts_unified` with:
   - `parent_videos` (per-video metadata like summary/keywords)
   - `video_chunks` (vectorized chunks for retrieval)
@@ -23,6 +23,16 @@ Ingest Markdown transcripts, build a local LanceDB knowledge base, and chat with
 - **Store metadata alongside chunks**: keep a parent table (summary/keywords) + child chunk table so the API can serve both “YouTube description/tags” and RAG citations cleanly.
 - **Serverless-friendly memory**: keep chat history in the Streamlit session and send it with each request so Azure Functions stays stateless.
 
+### Summary of Design Choices
+
+| Feature | Choice | Reason |
+| :--- | :--- | :--- |
+| **Database** | LanceDB | Embedded (no server setup), fast, handles vectors + metadata. |
+| **LLM** | Gemini | Large context window, cost-effective for RAG. |
+| **Chunking** | Token-based (400t) | Balance between granularity and context retention. |
+| **API** | FastAPI on Azure Functions | Standard Python async framework, serverless deployment. |
+| **Frontend** | Streamlit | Rapid UI development, handles session state client-side. |
+
 ## How the pieces connect
 
 ```
@@ -35,6 +45,12 @@ Streamlit UI (frontend/app.py)
   └─ calls Azure Functions HTTP API (function_app.py → api.py)
       └─ backend/rag.py retrieves from LanceDB and asks Gemini to answer
 ```
+
+### Retrieval Flow (Search → Join → Generate)
+
+1.  **Search**: Query the `video_chunks` table to find the top relevant text segments (400-token chunks).
+2.  **Join**: Use the `md_id` (foreign key) to look up the `filename` and `title` from `parent_videos`.
+3.  **Generate**: Pass the chunks + metadata to Gemini to generate the answer.
 
 Key API endpoints:
 - `GET /videos` (what’s in the Knowledge Base)
