@@ -44,7 +44,7 @@ docker buildx build \
 echo "✅ Frontend image pushed: $FULL_IMAGE_NAME"
 
 echo ""
-echo "📦 Images built and pushed:"
+echo "📦 Image built and pushed:"
 echo "   - $FULL_IMAGE_NAME"
 echo ""
 echo "🚀 Next Steps:"
