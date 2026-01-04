@@ -4,6 +4,10 @@ A RAG-based assistant that ingests YouTube transcripts to enable conversational 
 
 Ingest Markdown transcripts, build a local LanceDB knowledge base, and chat with it via a FastAPI app hosted as an Azure Function + a Streamlit UI.
 
+> **🚀 Bonus Update:** The frontend has been successfully deployed to Azure Web Apps (Containerized).
+> - **Live Demo:** [https://rag-frontend-datawizz.azurewebsites.net](https://rag-frontend-datawizz.azurewebsites.net)
+> - **Code:** Since this was done after the deadline/video recording, the deployment code is available in the [`feature/deploy_frontend`](https://github.com/katryl-yh/yt-rag-assistant/tree/feature/deploy_frontend) branch.
+
 ## Highlights (what this lab demonstrates)
 
 - Deterministic preprocessing: SHA256 dedup + repeatable outputs
