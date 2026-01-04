@@ -33,6 +33,18 @@ Ingest Markdown transcripts, build a local LanceDB knowledge base, and chat with
 | **API** | FastAPI on Azure Functions | Standard Python async framework, serverless deployment. |
 | **Frontend** | Streamlit | Rapid UI development, handles session state client-side. |
 
+### 🚀 Cloud Deployment (Post-Deadline Update)
+
+The frontend has been successfully containerized and deployed to Azure Web App.
+
+- **Live Demo**: [https://rag-frontend-datawizz.azurewebsites.net](https://rag-frontend-datawizz.azurewebsites.net)
+- **Deployment Branch**: Check the [`feature/deploy_frontend`](https://github.com/katryl-yh/yt-rag-assistant/tree/feature/deploy_frontend) branch for the deployment configuration files.
+
+**Deployment Architecture:**
+1.  **Multi-Stage Dockerfile**: Uses `uv` for fast, cached dependency installation and produces a minimal `python:3.11-slim` runtime image.
+2.  **Azure Container Registry (ACR)**: Image is built and pushed to a private Azure registry (`acrragdatawizz`).
+3.  **Azure Web App for Containers**: Hosting the Streamlit frontend, pulling the image securely from ACR.
+4.  **Configuration**: The Web App is configured with `API_BASE_URL` to communicate with the existing Azure Function backend.
 ## How the pieces connect
 
 ```
